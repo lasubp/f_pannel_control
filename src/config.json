@@ -1,0 +1,25 @@
+{
+  "defaults": {
+    "button_press_ms": 500,
+    "power_on_timeout_s": 15,
+    "force_off_hold_ms": 6000,
+    "graceful_off_timeout_s": 30,
+    "off_mode": "force",
+    "status_samples": 3,
+    "status_sample_ms": 30
+  },
+
+  "machines": {
+    "pc1": {
+      "i2c_bus": 1,
+      "pcf8574_address": "0x20",
+      "pins": {
+        "power_button": 0,
+        "reset_button": 1,
+        "power_led": 2,
+        "hdd_led": 3
+      }
+    }
+
+  }
+}
