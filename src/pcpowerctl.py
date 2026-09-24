@@ -15,6 +15,7 @@ def request(
     socket_path,
     payload
 ):
+
     data = (
         json.dumps(
             payload,
@@ -42,9 +43,7 @@ def request(
             "rb"
         )
 
-        response = (
-            file.readline()
-        )
+        response = file.readline()
 
         if not response:
             raise RuntimeError(
@@ -52,9 +51,7 @@ def request(
             )
 
         return json.loads(
-            response.decode(
-                "utf-8"
-            )
+            response.decode("utf-8")
         )
 
     finally:
@@ -82,16 +79,13 @@ def main():
         required=True
     )
 
-    sub.add_parser(
-        "list"
-    )
-
-    sub.add_parser(
-        "health"
-    )
+    sub.add_parser("list")
+    sub.add_parser("health")
 
     for command in (
         "status",
+        "inputs",
+        "raw",
         "on",
         "off",
         "reset"
@@ -105,11 +99,45 @@ def main():
             "machine"
         )
 
+    # --------------------------------------------------------
+    # Low-level button diagnostic
+    #
+    # pcpowerctl press power pc1
+    # pcpowerctl press reset pc1
+    #
+    # optionally:
+    #
+    # pcpowerctl press power pc1 --duration 1000
+    # --------------------------------------------------------
+
+    press_parser = sub.add_parser(
+        "press"
+    )
+
+    press_parser.add_argument(
+        "button",
+        choices=[
+            "power",
+            "reset"
+        ]
+    )
+
+    press_parser.add_argument(
+        "machine"
+    )
+
+    press_parser.add_argument(
+        "--duration",
+        type=int,
+        default=None,
+        help="button duration in milliseconds"
+    )
+
     args = parser.parse_args()
 
     payload = {
         "action":
-        args.command
+            args.command
     }
 
     if hasattr(
@@ -119,6 +147,18 @@ def main():
         payload["machine"] = (
             args.machine
         )
+
+    if args.command == "press":
+
+        payload["button"] = (
+            args.button
+        )
+
+        if args.duration is not None:
+
+            payload["duration_ms"] = (
+                args.duration
+            )
 
     try:
 
@@ -136,18 +176,7 @@ def main():
 
         return 2
 
-    if args.json:
-
-        print(
-            json.dumps(
-                response,
-                indent=2
-            )
-        )
-
-    elif not response.get(
-        "ok"
-    ):
+    if not response.get("ok"):
 
         print(
             response[
@@ -160,44 +189,87 @@ def main():
 
         return 1
 
+    result = response["result"]
+
+    if args.json:
+
+        print(
+            json.dumps(
+                result,
+                indent=2
+            )
+        )
+
+        return 0
+
+    # --------------------------------------------------------
+    # Human-readable output
+    # --------------------------------------------------------
+
+    if args.command == "list":
+
+        for machine in (
+            result["machines"]
+        ):
+            print(machine)
+
+    elif args.command == "health":
+
+        print(
+            json.dumps(
+                result,
+                indent=2
+            )
+        )
+
+    elif args.command == "raw":
+
+        print(
+            f'{result["name"]}: '
+            f'{result["hex"]} '
+            f'({result["binary"]})'
+        )
+
+        pins = result["pins"]
+
+        print(
+            " ".join(
+                f"{pin}="
+                f"{1 if value else 0}"
+                for pin, value
+                in pins.items()
+            )
+        )
+
+    elif args.command == "inputs":
+
+        print(
+            f'{result["name"]}: '
+            f'PWR_LED='
+            f'{"ON" if result["power_led"] else "OFF"} '
+            f'HDD_LED='
+            f'{"ON" if result["hdd_led"] else "OFF"}'
+        )
+
+    elif args.command == "press":
+
+        print(
+            f'{result["name"]}: '
+            f'{result["button"]} pressed '
+            f'for {result["duration_ms"]} ms'
+        )
+
     else:
 
-        result = response[
-            "result"
-        ]
-
-        if args.command == "list":
-
-            for machine in (
-                result["machines"]
-            ):
-                print(machine)
-
-        elif args.command == "health":
-
-            print(
-                json.dumps(
-                    result,
-                    indent=2
-                )
+        print(
+            f'{result["name"]}: '
+            f'{result["power"]}'
+            + (
+                f' hdd={result["hdd"]}'
+                if result.get("hdd") is not None
+                else ""
             )
-
-        else:
-
-            line = (
-                f'{result["name"]}: '
-                f'{result["power"]}'
-            )
-
-            if (
-                result.get("hdd")
-                is not None
-            ):
-                line += (
-                    f' hdd={result["hdd"]}'
-                )
-
-            print(line)
+        )
 
     return 0
 

@@ -109,6 +109,31 @@ class RequestHandler(
 
         if action == "status":
             return machine.status()
+        
+        if action == "inputs":
+            return machine.inputs()
+        
+        if action == "raw":
+            return machine.raw()
+        
+        if action == "press":
+            button = request.get(
+                "button"
+            )
+
+            if not button:
+                raise PCPowerError(
+                    "button is required"
+                )
+
+            duration_ms = request.get(
+                "duration_ms"
+            )
+
+            return machine.debug_press(
+                button,
+                duration_ms
+            )
 
         if action == "on":
             return machine.power_on()
