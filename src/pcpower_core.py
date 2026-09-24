@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 
 import json
+import logging
 import threading
 import time
 import yaml
 
 from smbus2 import SMBus
+
+
+LOG = logging.getLogger("pcpower_core")
 
 
 class PCPowerError(Exception):
@@ -761,10 +765,17 @@ class Controller:
 
         self.used_pins = {}
 
-        self._build(config)
+        # Serializes reload() against itself. Readers
+        # (get/list_machines/health/dispatch) never need
+        # this lock - self.expanders/machines/used_pins are
+        # swapped in with a single atomic assignment.
+        self._reload_lock = threading.Lock()
+
+        self._apply(config)
 
     def _get_expander(
         self,
+        expanders,
         bus,
         address
     ):
@@ -773,9 +784,9 @@ class Controller:
             address
         )
 
-        if key not in self.expanders:
+        if key not in expanders:
 
-            self.expanders[key] = (
+            expanders[key] = (
                 PCF8574(
                     self.pool,
                     bus,
@@ -783,10 +794,11 @@ class Controller:
                 )
             )
 
-        return self.expanders[key]
+        return expanders[key]
 
     def _reserve_pin(
         self,
+        used_pins,
         machine,
         signal,
         bus,
@@ -799,20 +811,35 @@ class Controller:
             pin
         )
 
-        if key in self.used_pins:
+        if key in used_pins:
 
             raise PCPowerError(
                 f"{machine}.{signal} uses "
                 f"I2C-{bus} 0x{address:02x} "
                 f"P{pin}, already used by "
-                f"{self.used_pins[key]}"
+                f"{used_pins[key]}"
             )
 
-        self.used_pins[key] = (
+        used_pins[key] = (
             f"{machine}.{signal}"
         )
 
     def _build(self, config):
+        """
+        Build a fresh set of expanders/machines/used_pins from
+        config. Operates on local state only, never touches
+        self.* directly, so a bad config can't disturb whatever
+        is currently running - see _apply()/reload(). Raises
+        PCPowerError on any config problem (bad fields,
+        duplicate pins, unknown off_mode).
+
+        Does NOT raise if a configured PCF8574 fails to
+        respond on the bus: that chip is logged as unavailable
+        and its machines will simply error out per-call (and
+        show up unhealthy in health()) instead of taking the
+        whole daemon down - e.g. when the config lists more
+        machines than are physically connected.
+        """
 
         defaults = dict(
             self.DEFAULTS
@@ -836,6 +863,10 @@ class Controller:
             raise PCPowerError(
                 "No machines configured"
             )
+
+        expanders = {}
+        machines = {}
+        used_pins = {}
 
         for name, cfg in (
             machine_configs.items()
@@ -882,6 +913,7 @@ class Controller:
                 pins[signal] = pin
 
                 self._reserve_pin(
+                    used_pins,
                     name,
                     signal,
                     bus,
@@ -911,12 +943,13 @@ class Controller:
 
             expander = (
                 self._get_expander(
+                    expanders,
                     bus,
                     address
                 )
             )
 
-            self.machines[name] = (
+            machines[name] = (
                 Machine(
                     name,
                     expander,
@@ -925,11 +958,60 @@ class Controller:
                 )
             )
 
-        # Initialize each physical chip once.
+        # Probe each physical chip once. A chip that doesn't
+        # answer (not wired up, wrong address, config lists
+        # more machines than are connected...) is logged and
+        # left as-is rather than aborting the whole build -
+        # machines on OTHER, working chips must still come up.
         for expander in (
-            self.expanders.values()
+            expanders.values()
         ):
-            expander.initialize()
+            try:
+                expander.initialize()
+
+            except PCPowerError as error:
+                LOG.warning(
+                    "I2C-%d 0x%02x did not respond during "
+                    "init; machines on it will fail until "
+                    "it's reachable: %s",
+                    expander.bus_number,
+                    expander.address,
+                    error
+                )
+
+        return expanders, machines, used_pins
+
+    def _apply(self, config):
+
+        expanders, machines, used_pins = (
+            self._build(config)
+        )
+
+        self.expanders = expanders
+        self.machines = machines
+        self.used_pins = used_pins
+
+    def reload(self, config_path):
+        """
+        Reload configuration from disk.
+
+        The new config is fully loaded and validated before
+        anything is swapped in. If it's bad, this raises and
+        the daemon keeps running on the previous, known-good
+        configuration - callers should catch PCPowerError.
+
+        Note: the underlying BusPool/SMBus handles are kept
+        across reloads (I2C buses no longer referenced by the
+        new config are simply left open, not closed).
+        """
+
+        with self._reload_lock:
+
+            config = load_config(
+                config_path
+            )
+
+            self._apply(config)
 
     def get(self, name):
 

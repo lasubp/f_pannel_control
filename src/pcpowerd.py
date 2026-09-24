@@ -32,9 +32,11 @@ class ThreadingUnixServer(
         self,
         socket_path,
         handler_class,
-        controller
+        controller,
+        config_path
     ):
         self.controller = controller
+        self.config_path = config_path
 
         super().__init__(
             socket_path,
@@ -106,6 +108,18 @@ class RequestHandler(
         if action == "health":
 
             return controller.health()
+
+        if action == "reload":
+
+            controller.reload(
+                self.app_server.config_path
+            )
+
+            return {
+                "reloaded": True,
+                "machines":
+                    controller.list_machines()
+            }
 
         # --------------------------------
         # Machine operations
@@ -321,7 +335,8 @@ def main():
     server = ThreadingUnixServer(
         args.socket,
         RequestHandler,
-        controller
+        controller,
+        args.config
     )
 
     # Allow owner + pcpower group.
@@ -353,6 +368,46 @@ def main():
             daemon=True
         ).start()
 
+    def do_reload():
+
+        try:
+            controller.reload(
+                args.config
+            )
+
+            LOG.info(
+                "Reload complete. Machines: %s",
+                ", ".join(
+                    controller.list_machines()
+                )
+            )
+
+        except Exception as error:
+
+            LOG.error(
+                "Reload failed, keeping previous "
+                "configuration: %s",
+                error
+            )
+
+    def reload_signal(
+        signum,
+        frame
+    ):
+        del frame
+
+        LOG.info(
+            "Reload requested (signal %d)",
+            signum
+        )
+
+        # Do the actual I2C/config work off the signal
+        # handler, same as shutdown does.
+        threading.Thread(
+            target=do_reload,
+            daemon=True
+        ).start()
+
     signal.signal(
         signal.SIGTERM,
         stop
@@ -361,6 +416,11 @@ def main():
     signal.signal(
         signal.SIGINT,
         stop
+    )
+
+    signal.signal(
+        signal.SIGHUP,
+        reload_signal
     )
 
     LOG.info(

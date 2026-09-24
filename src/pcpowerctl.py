@@ -32,6 +32,11 @@ def main():
     sub.add_parser("list")
     sub.add_parser("health")
 
+    # Reload the daemon's config file from disk without
+    # restarting the service or losing in-flight state.
+    # Equivalent to `kill -HUP <pcpowerd pid>`.
+    sub.add_parser("reload")
+
     for command in ("status", "inputs", "raw", "on", "off", "reset"):
         p = sub.add_parser(command)
         p.add_argument("machine")
@@ -93,6 +98,10 @@ def main():
 
     elif args.command == "health":
         print(json.dumps(result, indent=2))
+
+    elif args.command == "reload":
+        machines = ", ".join(result.get("machines", []))
+        print(f"Reloaded config. Machines: {machines}")
 
     elif args.command == "raw":
         print(f'{result["name"]}: {result["hex"]} ({result["binary"]})')
