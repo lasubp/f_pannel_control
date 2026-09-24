@@ -3,6 +3,7 @@
 import json
 import threading
 import time
+import yaml
 
 from smbus2 import SMBus
 
@@ -25,7 +26,10 @@ def parse_int(value):
 
 def load_config(path):
     with open(path, "r", encoding="utf-8") as f:
-        config = json.load(f)
+        if path.endswith((".yaml", ".yml")):
+            config = yaml.safe_load(f)
+        else:
+            config = json.load(f)
 
     if not isinstance(config, dict):
         raise PCPowerError(

@@ -19,6 +19,16 @@
         "power_led": 2,
         "hdd_led": 3
       }
+    },
+    "pc2": {
+      "i2c_bus": 1,
+      "pcf8574_address": "0x21",
+      "pins": {
+        "power_button": 0,
+        "reset_button": 1,
+        "power_led": 2,
+        "hdd_led": 3
+      }
     }
 
   }

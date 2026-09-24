@@ -9,3 +9,4 @@ rsync -v ./src/pcpower_core.py ${SSH_USER}@${SSH_MASHINE}:/opt/pcpower/pcpower_c
 rsync -v ./src/pcpowerd.py ${SSH_USER}@${SSH_MASHINE}:/opt/pcpower/pcpowerd.py
 rsync -v ./src/pcpowerctl.py ${SSH_USER}@${SSH_MASHINE}:/opt/pcpower/pcpowerctl.py
 rsync -v ./src/pcpowerd.service ${SSH_USER}@${SSH_MASHINE}:/etc/systemd/system/pcpowerd.service
+rsync -v ./src/config.yaml ${SSH_USER}@${SSH_MASHINE}:/etc/pcpower/config.yaml

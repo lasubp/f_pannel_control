@@ -266,7 +266,7 @@ def main():
 
     parser.add_argument(
         "--config",
-        default="/etc/pcpower/config.json"
+        default="/etc/pcpower/config.yaml"
     )
 
     parser.add_argument(
