@@ -26,6 +26,19 @@ class ThreadingUnixServer(
 ):
     daemon_threads = True
 
+    def __init__(
+        self,
+        socket_path,
+        handler_class,
+        controller
+    ):
+        super().__init__(
+            socket_path,
+            handler_class
+        )
+
+        self.controller = controller
+
 
 class RequestHandler(
     socketserver.StreamRequestHandler
@@ -291,10 +304,7 @@ def main():
 
     server = ThreadingUnixServer(
         args.socket,
-        RequestHandler
-    )
-
-    server.controller = (
+        RequestHandler,
         controller
     )
 
