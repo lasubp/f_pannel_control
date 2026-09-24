@@ -5,6 +5,7 @@ import logging
 import threading
 import time
 import yaml
+from contextlib import contextmanager
 
 from smbus2 import SMBus
 
@@ -770,6 +771,10 @@ class Controller:
         # this lock - self.expanders/machines/used_pins are
         # swapped in with a single atomic assignment.
         self._reload_lock = threading.Lock()
+        self._operation_condition = threading.Condition()
+        self._active_requests = 0
+        self._reloading = False
+        self._closed = False
 
         self._apply(config)
 
@@ -991,6 +996,24 @@ class Controller:
         self.machines = machines
         self.used_pins = used_pins
 
+    @contextmanager
+    def operation(self):
+        with self._operation_condition:
+            while self._reloading and not self._closed:
+                self._operation_condition.wait()
+
+            if self._closed:
+                raise PCPowerError("Controller is closed")
+
+            self._active_requests += 1
+
+        try:
+            yield
+        finally:
+            with self._operation_condition:
+                self._active_requests -= 1
+                self._operation_condition.notify_all()
+
     def reload(self, config_path):
         """
         Reload configuration from disk.
@@ -1006,12 +1029,21 @@ class Controller:
         """
 
         with self._reload_lock:
+            with self._operation_condition:
+                if self._closed:
+                    raise PCPowerError("Controller is closed")
 
-            config = load_config(
-                config_path
-            )
+                self._reloading = True
+                while self._active_requests:
+                    self._operation_condition.wait()
 
-            self._apply(config)
+            try:
+                config = load_config(config_path)
+                self._apply(config)
+            finally:
+                with self._operation_condition:
+                    self._reloading = False
+                    self._operation_condition.notify_all()
 
     def get(self, name):
 
@@ -1077,4 +1109,15 @@ class Controller:
         }
 
     def close(self):
-        self.pool.close()
+        with self._reload_lock:
+            with self._operation_condition:
+                if self._closed:
+                    return
+
+                self._closed = True
+                self._operation_condition.notify_all()
+
+                while self._active_requests:
+                    self._operation_condition.wait()
+
+            self.pool.close()

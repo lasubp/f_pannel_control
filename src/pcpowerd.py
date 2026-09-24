@@ -86,7 +86,7 @@ class RequestHandler(
 
         self.wfile.flush()
 
-    def dispatch(self, request):
+    def _dispatch(self, request):
 
         action = request.get(
             "action"
@@ -178,6 +178,13 @@ class RequestHandler(
         raise PCPowerError(
             f"Unknown action: {action}"
         )
+
+    def dispatch(self, request):
+        if request.get("action") == "reload":
+            return self._dispatch(request)
+
+        with self.app_server.controller.operation():
+            return self._dispatch(request)
 
     def handle(self):
 
