@@ -77,10 +77,20 @@ class BusPool:
         bus, lock = self._get(bus_number)
 
         with lock:
-            bus.write_byte(
+            try:
+                bus.write_byte(
                 address,
                 value & 0xFF
             )
+
+            except OSError as error:
+                raise PCPowerError(
+                    f"I2C write failed: "
+                    f"/dev/i2c-{bus_number}, "
+                    f"address 0x{address:02x}, "
+                    f"value 0x{value & 0xff:02x}: "
+                    f"{error}"
+                ) from error
 
     def read_byte(
         self,
@@ -90,9 +100,18 @@ class BusPool:
         bus, lock = self._get(bus_number)
 
         with lock:
-            return bus.read_byte(
-                address
-            )
+            try: 
+                return bus.read_byte(
+                    address
+                )
+            
+            except OSError as error:
+                raise PCPowerError(
+                    f"I2C read failed: "
+                    f"/dev/i2c-{bus_number}, "
+                    f"address 0x{address:02x}: "
+                    f"{error}"
+                ) from error
 
     def close(self):
         with self._guard:
@@ -379,106 +398,106 @@ class Machine:
     ):
         """
         Low-level diagnostic button press.
-    
+
         Unlike power_on(), this does NOT wait for LEDs
         and does NOT care about current machine state.
         """
-    
+
         if duration_ms is None:
             duration_ms = int(
                 self.settings["button_press_ms"]
             )
-    
+
         button = button.lower()
-    
+
         if button == "power":
             pin = self.power_pin
-    
+
         elif button == "reset":
-        
+
             if self.reset_pin is None:
                 raise PCPowerError(
                     f"{self.name}: reset is not configured"
                 )
-    
+
             pin = self.reset_pin
-    
+
         else:
             raise PCPowerError(
                 f"Unknown button: {button}"
             )
-    
+
         with self.operation_lock:
-        
+
             self._press(
                 pin,
                 int(duration_ms)
             )
-    
+
         return {
             "name": self.name,
             "button": button,
             "duration_ms": int(duration_ms)
         }
-    
-    
+
+
     def inputs(self):
         """
         Logical motherboard LED inputs.
         """
-    
+
         power = self._active_low(
             self.power_led_pin
         )
-    
+
         if self.hdd_led_pin is None:
             hdd = None
         else:
             hdd = self._active_low(
                 self.hdd_led_pin
             )
-    
+
         return {
             "name": self.name,
             "power_led": power,
             "hdd_led": hdd
         }
-    
-    
+
+
     def raw(self):
         """
         Raw PCF8574 hardware state.
         """
-    
+
         value = self.expander.read_byte()
-    
+
         pins = {}
-    
+
         for pin in range(8):
-        
+
             pins[f"P{pin}"] = bool(
                 value & (1 << pin)
             )
-    
+
         return {
             "name": self.name,
-    
+
             "i2c_bus":
                 self.expander.bus_number,
-    
+
             "address":
                 f"0x{self.expander.address:02x}",
-    
+
             "hex":
                 f"0x{value:02x}",
-    
+
             "binary":
                 f"{value:08b}",
-    
+
             "pins":
                 pins
         }
-    
+
     # ========================================================
     # Button handling
     # ========================================================
