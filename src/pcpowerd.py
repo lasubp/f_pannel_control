@@ -9,6 +9,7 @@ import socketserver
 import stat
 import sys
 import threading
+from typing import cast
 
 from pcpower_core import (
     Controller,
@@ -25,6 +26,7 @@ class ThreadingUnixServer(
     socketserver.UnixStreamServer
 ):
     daemon_threads = True
+    allow_reuse_address = True
 
     def __init__(
         self,
@@ -32,12 +34,12 @@ class ThreadingUnixServer(
         handler_class,
         controller
     ):
+        self.controller = controller
+
         super().__init__(
             socket_path,
             handler_class
         )
-
-        self.controller = controller
 
 
 class RequestHandler(
@@ -45,6 +47,10 @@ class RequestHandler(
 ):
 
     MAX_REQUEST = 64 * 1024
+    
+    @property
+    def app_server(self) -> ThreadingUnixServer:
+        return cast(ThreadingUnixServer, self.server)
 
     def send_response(
         self,
@@ -84,9 +90,7 @@ class RequestHandler(
             "action"
         )
 
-        controller = (
-            self.server.controller
-        )
+        controller = self.app_server.controller
 
         # --------------------------------
         # Generic operations
@@ -210,10 +214,20 @@ class RequestHandler(
                     "Request failed"
                 )
 
-                self.send_response(
-                    False,
-                    error=error
-                )
+                # The client may already be gone (crashed,
+                # timed out, closed the socket); don't let a
+                # failed error-report kill the handler thread.
+                try:
+                    self.send_response(
+                        False,
+                        error=error
+                    )
+
+                except (
+                    BrokenPipeError,
+                    ConnectionResetError
+                ):
+                    return
 
 
 def prepare_socket(path):
@@ -287,16 +301,18 @@ def main():
 
     if args.check:
 
-        print(
-            json.dumps(
-                controller.health(),
-                indent=2
+        try:
+            print(
+                json.dumps(
+                    controller.health(),
+                    indent=2
+                )
             )
-        )
 
-        controller.close()
+            return 0
 
-        return 0
+        finally:
+            controller.close()
 
     prepare_socket(
         args.socket
@@ -320,6 +336,8 @@ def main():
         signum,
         frame
     ):
+        del frame
+
         if stopping.is_set():
             return
 
