@@ -1,0 +1,15 @@
+[Unit]
+Description=Optional PC Power Prometheus exporter
+Requires=pcpowerd.service
+After=pcpowerd.service
+
+[Service]
+Type=simple
+User=pcpower
+Group=pcpower
+ExecStart=/opt/pcpower/venv/bin/python /opt/pcpower/pcpower_exporter.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
