@@ -11,3 +11,4 @@ rsync -v ${SRC}/pcpowerd.py ${SSH_USER}@${SSH_MASHINE}:/opt/pcpower/pcpowerd.py
 rsync -v ${SRC}/pcpowerctl.py ${SSH_USER}@${SSH_MASHINE}:/opt/pcpower/pcpowerctl.py
 rsync -v ${SRC}/pcpowerd.service ${SSH_USER}@${SSH_MASHINE}:/etc/systemd/system/pcpowerd.service
 rsync -v ${SRC}/config.yaml ${SSH_USER}@${SSH_MASHINE}:/etc/pcpower/config.yaml
+rsync -Rv ../addons ${SSH_USER}@${SSH_MASHINE}:/root

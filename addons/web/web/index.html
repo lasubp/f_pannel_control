@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PC Power</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="top">
+      <div>
+        <p class="eyebrow">LOCAL POWER CONTROL</p>
+        <h1>Machines</h1>
+        <p class="subtitle">Power and LED state from pcpowerd</p>
+      </div>
+      <div class="top-actions">
+        <span id="connection" class="connection" role="status">Connecting…</span>
+        <button id="refresh" type="button" class="button subtle">Refresh</button>
+        <button id="reload" type="button" class="button subtle">Reload config</button>
+      </div>
+    </header>
+
+    <section class="summary" aria-label="Overview">
+      <div><strong id="count">—</strong><span>machines</span></div>
+      <div><strong id="online">—</strong><span>on</span></div>
+      <div><strong id="health">—</strong><span>I²C health</span></div>
+      <div><strong id="updated">—</strong><span>last update</span></div>
+    </section>
+
+    <section id="machines" class="cards" aria-label="Machine controls"></section>
+    <p id="empty" class="empty" hidden>No machines are configured.</p>
+    <p id="message" class="message" role="status" aria-live="polite"></p>
+    <footer>Refreshes every 5 seconds · Button actions use the existing daemon</footer>
+  </main>
+</body>
+</html>
