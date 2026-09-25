@@ -5,7 +5,7 @@ mkdir /etc/pcpower
 mkdir /opt/pcpower
 
 # Copy filed to desired dirs
-cp ./src/config.json /etc/pcpower/config.json
+cp ./src/config.json /etc/pcpower/config.yaml
 cp ./src/pcpower_core.py /opt/pcpower/pcpower_core.py
 cp ./src/pcpowerd.py /opt/pcpower/pcpowerd.py
 cp ./src/pcpowerctl.py /opt/pcpower/pcpowerctl.py
@@ -36,7 +36,7 @@ python3 -m venv \
 
 # Install external pyhon dependencies in env
 /opt/pcpower/venv/bin/pip \
-    install smbus2
+    install smbus2 pyyaml
 
 # create dedicated user
 groupadd --system pcpower
