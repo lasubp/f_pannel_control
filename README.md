@@ -1,3 +1,7 @@
+# Purpose
+
+Main purpose of this project is tool to be able to controll power of any PC remotedly using its front pannel connectors and some SMC with electronics. Connect RPI (or any other SBS that can work with) to custom control board adapret and to controlled Pc front pannel header. And use your local machine or any other server to connect to that RPI overssh, to use built in CLI tool `pcpowercli`. Also this app supports plugins, and some already bult in in the project, such as MAAS WEB-hooks and WEB UI
+
 # Developed and tested on
 
 SBC: Raspberry PI 3b
